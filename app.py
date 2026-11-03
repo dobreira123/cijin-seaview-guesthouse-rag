@@ -553,18 +553,29 @@ def run_agent(chat_history, memory=None):
     for step in range(MAX_STEPS):
         message = client.chat.completions.create(
             model=CHAT_MODEL, messages=messages + [reminder], tools=TOOL_SPECS, temperature=0,
-            **({"tool_choice": "required"} if forced else {}),
         ).choices[0].message
 
         if not message.tool_calls:
             answer = (message.content or "").strip()
-            # Check in code: a guesthouse question answered with NO tool may be made up, so ask again with a tool.
-            # Not for a reply to our own question, a very short message, or a refusal of a real off-topic request.
+            # Check in code: a question that the house rules clearly cover must not be answered without a source
+            # (a small model sometimes answers from memory, or refuses it as "off-topic"). Then the program runs the
+            # RAG search itself, adds the result as a tool call, and lets the model answer again.
             refused = any(w in answer for w in ("only help", "只能協助", words["out"][:20]))
-            if (step == 0 and not forced and waiting is None and len(question) > 10
-                    and (not refused or rules_score(question) >= MIN_SCORE + 0.02)):
-                forced = True
-                continue
+            if step == 0 and not forced and waiting is None and len(question) > 10:
+                score = rules_score(question)
+                if score >= MIN_SCORE + (0.02 if refused else 0):
+                    forced = True
+                    arguments = {"question": question}
+                    result = search_house_rules(question)
+                    messages.append({"role": "assistant", "content": "", "tool_calls": [{
+                        "id": "auto_rag", "type": "function", "function": {
+                            "name": "search_house_rules", "arguments": json.dumps(arguments, ensure_ascii=False)}}]})
+                    messages.append({"role": "tool", "tool_call_id": "auto_rag",
+                                     "content": json.dumps(result, ensure_ascii=False)})
+                    trace.append({"step": 1, "tool": "search_house_rules (added by the program)",
+                                  "arguments": arguments, "result": result})
+                    memory["messages"] = messages[1:]
+                    continue
             memory["messages"].append({"role": "assistant", "content": answer})
             return answer, trace
 
@@ -582,7 +593,6 @@ def run_agent(chat_history, memory=None):
             messages.append({"role": "tool", "tool_call_id": call.id,
                              "content": json.dumps(result, ensure_ascii=False)})
         memory["messages"] = messages[1:]              # keep the tool calls for the next turn
-        forced = False
 
     # Too many steps: one last call that may not use tools, so the guest still gets an answer from the results.
     answer = (client.chat.completions.create(model=CHAT_MODEL, messages=messages + [reminder], tools=TOOL_SPECS,
