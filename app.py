@@ -489,48 +489,99 @@ def text_of(content):
     return str(content or "")
 
 
-def run_agent(chat_history):
-    """Answer the last question in chat_history. Returns (answer, trace)."""
+WRITE_TOOLS = ("make_booking", "cancel_booking")
+SENTENCES = {   # the exact refusal sentences, one per language (the program chooses the language)
+    "English": {"not_found": NOT_FOUND_SENTENCE.split(" / ")[0], "out": OUT_OF_SCOPE_SENTENCE.split(" / ")[0]},
+    "Traditional Chinese (繁體中文)": {"not_found": NOT_FOUND_SENTENCE.split(" / ")[1],
+                                    "out": OUT_OF_SCOPE_SENTENCE.split(" / ")[1]},
+}
+
+
+def rules_score(question):
+    """How well the best house-rule section matches the question (used by the no-tool check)."""
+    q = embed([question])[0]
+    return float((RULE_VECTORS @ (q / np.linalg.norm(q))).max())
+
+
+def run_tool(name, arguments, memory, waiting):
+    """Run one tool call. The confirmation rule for writing is enforced HERE, in code:
+    a booking is saved or cancelled only when the guest saw the summary in an earlier turn and the model
+    now confirms the SAME action. The saved values are the ones the guest saw, not new ones from the model."""
+    if name not in TOOL_FUNCTIONS:                     # only our own tools may run
+        return arguments, {"error": f"Unknown tool '{name}'. Use only the listed tools."}
+    if name in WRITE_TOOLS:
+        if arguments.get("confirmed") and waiting and waiting["tool"] == name:
+            arguments = {**waiting["arguments"], "confirmed": True}       # exactly what the guest agreed to
+        elif arguments.get("confirmed"):
+            arguments = {**arguments, "confirmed": False}                 # no summary shown yet: show it first
+    try:
+        result = TOOL_FUNCTIONS[name](**arguments)
+    except Exception as error:                         # wrong arguments: tell the model, do not crash
+        return arguments, {"error": f"The tool could not run: {error}"}
+    if name in WRITE_TOOLS and isinstance(result, dict) and result.get("needs_confirmation"):
+        memory["waiting"] = {"tool": name, "arguments": {k: v for k, v in arguments.items() if k != "confirmed"}}
+    return arguments, result
+
+
+def run_agent(chat_history, memory=None):
+    """Answer the last question in chat_history. Returns (answer, trace).
+    memory (a dict kept per chat) holds the model's full messages, including earlier tool calls and results,
+    and the write action that waits for the guest's "yes"."""
+    memory = memory if memory is not None else {}
+    if "messages" not in memory:                       # e.g. the tests: start from the visible chat
+        memory["messages"] = [{"role": m["role"], "content": text_of(m["content"])} for m in chat_history[:-1]]
     question = text_of(chat_history[-1]["content"])
-    messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
-                + [{"role": m["role"], "content": text_of(m["content"])} for m in chat_history[:-1]]
-                + [{"role": "user", "content": question}])
+    language = reply_language(question)
+    waiting = memory.pop("waiting", None)              # a summary shown in the last turn, waiting for "yes"
+    memory["messages"].append({"role": "user", "content": question})
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + memory["messages"]
     # The program picks the language. The reminder is always the LAST message, also after tool results,
     # because the house rules are written in two languages and a small model easily switches language.
-    reminder = {"role": "system", "content": (f"Reply in {reply_language(question)} only. A new question about the "
-                                              "guesthouse needs a tool; anything else gets the out-of-scope sentence.")}
+    words = SENTENCES[language]
+    reminder = {"role": "system", "content": (
+        f"Reply in {language} only. A new question about the guesthouse needs a tool. "
+        f"If the tools found nothing, say: \"{words['not_found']}\" If the request is not about the guesthouse, "
+        f"say: \"{words['out']}\"")}
     trace = []
+    forced = False
 
     for step in range(MAX_STEPS):
         message = client.chat.completions.create(
             model=CHAT_MODEL, messages=messages + [reminder], tools=TOOL_SPECS, temperature=0,
+            **({"tool_choice": "required"} if forced else {}),
         ).choices[0].message
 
-        if not message.tool_calls:                     # plain text: the turn is finished
-            return (message.content or "").strip(), trace
+        if not message.tool_calls:
+            answer = (message.content or "").strip()
+            # Check in code: a guesthouse question answered with NO tool may be made up, so ask again with a tool.
+            # Not for a reply to our own question, a very short message, or a refusal of a real off-topic request.
+            refused = any(w in answer for w in ("only help", "只能協助", words["out"][:20]))
+            if (step == 0 and not forced and waiting is None and len(question) > 10
+                    and (not refused or rules_score(question) >= MIN_SCORE + 0.02)):
+                forced = True
+                continue
+            memory["messages"].append({"role": "assistant", "content": answer})
+            return answer, trace
 
         messages.append({"role": "assistant", "content": message.content or "",
                          "tool_calls": [{"id": c.id, "type": "function",
                                          "function": {"name": c.function.name, "arguments": c.function.arguments}}
                                         for c in message.tool_calls]})
         for call in message.tool_calls:
-            name = call.function.name
             try:
                 arguments = json.loads(call.function.arguments or "{}")
             except json.JSONDecodeError:
                 arguments = {}
-            if name not in TOOL_FUNCTIONS:             # only our own tools may run
-                result = {"error": f"Unknown tool '{name}'. Use only the listed tools."}
-            else:
-                try:
-                    result = TOOL_FUNCTIONS[name](**arguments)
-                except Exception as error:             # wrong arguments: tell the model, do not crash
-                    result = {"error": f"The tool could not run: {error}"}
-            trace.append({"step": step + 1, "tool": name, "arguments": arguments, "result": result})
+            arguments, result = run_tool(call.function.name, arguments, memory, waiting)
+            trace.append({"step": step + 1, "tool": call.function.name, "arguments": arguments, "result": result})
             messages.append({"role": "tool", "tool_call_id": call.id,
                              "content": json.dumps(result, ensure_ascii=False)})
+        memory["messages"] = messages[1:]              # keep the tool calls for the next turn
+        forced = False
 
-    return f"Sorry, I could not finish that. Please contact our staff: {STAFF_CONTACT}.", trace
+    answer = f"Sorry, I could not finish that. Please contact our staff: {STAFF_CONTACT}."
+    memory["messages"].append({"role": "assistant", "content": answer})
+    return answer, trace
 
 
 # ---------------------------------------------------------------------------------------
@@ -604,16 +655,16 @@ def add_user_message(user_text, chat_history):
     return "", chat_history + [{"role": "user", "content": user_text}]
 
 
-def answer_question(chat_history):
+def answer_question(chat_history, memory):
     if not chat_history or chat_history[-1]["role"] != "user":
-        return chat_history, EMPTY_TRACE
+        return chat_history, EMPTY_TRACE, memory
     try:
-        answer, trace = run_agent(chat_history)
+        answer, trace = run_agent(chat_history, memory)
         panel = format_trace(trace)
     except Exception as error:
         answer = f"(system message) API error: {error}"
         panel = "### Tools used 工具軌跡\n\n(the call failed)"
-    return chat_history + [{"role": "assistant", "content": answer}], panel
+    return chat_history + [{"role": "assistant", "content": answer}], panel, memory
 
 
 with gr.Blocks(title="Cijin Seaview Guesthouse Help Desk") as demo:
@@ -643,17 +694,20 @@ with gr.Blocks(title="Cijin Seaview Guesthouse Help Desk") as demo:
                                 gr.Examples(examples=questions, inputs=user_box, label=group)
                 with gr.Column(scale=2):
                     trace_panel = gr.Markdown(EMPTY_TRACE)
+            memory_state = gr.State({})            # the agent's own memory of this chat (tool calls, waiting action)
         with gr.Tab("Bookings 訂房資料表"):
             gr.Markdown("The `bookings` table in guesthouse.db. Press Refresh after a booking or a cancellation.")
             refresh_button = gr.Button("Refresh 重新整理")
             bookings_view = gr.Dataframe(value=bookings_table(), headers=BOOKING_HEADERS, interactive=False)
 
     send_button.click(add_user_message, [user_box, chatbot], [user_box, chatbot]).then(
-        answer_question, chatbot, [chatbot, trace_panel]).then(bookings_table, outputs=bookings_view)
+        answer_question, [chatbot, memory_state], [chatbot, trace_panel, memory_state]).then(
+        bookings_table, outputs=bookings_view)
     user_box.submit(add_user_message, [user_box, chatbot], [user_box, chatbot]).then(
-        answer_question, chatbot, [chatbot, trace_panel]).then(bookings_table, outputs=bookings_view)
+        answer_question, [chatbot, memory_state], [chatbot, trace_panel, memory_state]).then(
+        bookings_table, outputs=bookings_view)
     clear_button.click(start_chat, outputs=chatbot).then(
-        lambda: ("", EMPTY_TRACE), outputs=[user_box, trace_panel])
+        lambda: ("", EMPTY_TRACE, {}), outputs=[user_box, trace_panel, memory_state])
     refresh_button.click(bookings_table, outputs=bookings_view)
 
 
