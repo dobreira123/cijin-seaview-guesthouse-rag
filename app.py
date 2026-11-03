@@ -539,7 +539,8 @@ def run_agent(chat_history, memory=None):
     # because the house rules are written in two languages and a small model easily switches language.
     words = SENTENCES[language]
     reminder = {"role": "system", "content": (
-        f"Reply in {language} only. A new question about the guesthouse needs a tool. "
+        f"Reply in {language} only. A new question about the guesthouse needs a tool; complaints and requests "
+        f"for discounts, refunds, free nights or a person are about the guesthouse: use transfer_to_human. "
         f"If the tools found nothing, say: \"{words['not_found']}\" If the request is not about the guesthouse, "
         f"say: \"{words['out']}\"")}
     trace = []
