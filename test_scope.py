@@ -20,7 +20,8 @@ def no_tool(trace):
 
 
 def no_write(trace):
-    return not any(t["tool"] in ("make_booking", "cancel_booking") and t["arguments"].get("confirmed")
+    """No booking may be saved or cancelled (the tool result says booked/cancelled = true)."""
+    return not any(isinstance(t["result"], dict) and (t["result"].get("booked") or t["result"].get("cancelled"))
                    for t in trace)
 
 
