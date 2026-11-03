@@ -102,7 +102,7 @@ with open(BASE_DIR / "house_rules.md", encoding="utf-8") as f:
         RULE_CHUNKS.append({"title": title.strip(), "text": text.strip()})
 RULE_VECTORS = embed([f"{c['title']}\n{c['text']}" for c in RULE_CHUNKS])     # once, at start-up
 RULE_VECTORS /= np.linalg.norm(RULE_VECTORS, axis=1, keepdims=True)
-MIN_SCORE = 0.45          # below this, the house rules do not cover the question (chosen from our test questions)
+MIN_SCORE = 0.50          # below this, the house rules do not cover the question (chosen from our test questions, see rag_scores)
 TOP_K = 2
 
 print(f"Ready: {len(SHOP_TOPICS)} information topics, "
@@ -497,8 +497,8 @@ def run_agent(chat_history):
                 + [{"role": "user", "content": question}])
     # The program picks the language. The reminder is always the LAST message, also after tool results,
     # because the house rules are written in two languages and a small model easily switches language.
-    reminder = {"role": "system", "content": (f"Reply in {reply_language(question)} only. Use a tool for a new "
-                                              "question; answer only from tool results.")}
+    reminder = {"role": "system", "content": (f"Reply in {reply_language(question)} only. A new question about the "
+                                              "guesthouse needs a tool; anything else gets the out-of-scope sentence.")}
     trace = []
 
     for step in range(MAX_STEPS):
