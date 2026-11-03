@@ -1,0 +1,11 @@
+booking_id,guest_name,phone_last4,room,check_in,nights,guests,total,deposit_paid,status
+B1001,Chen Mei-Ling,2381,Seaview Double Room,2026-11-07,2,2,7040,2112,confirmed
+B1002,Wang Chih-Hao,5520,Family Room,2026-11-14,3,4,14868,4460,confirmed
+B1003,Lee Ya-Ting,0917,Twin Room,2026-11-20,1,2,2600,780,confirmed
+B1004,Tsai Kuan-Yu,7743,Tatami Room,2026-11-28,2,6,12320,3696,confirmed
+B1005,Huang Shu-Fen,3306,Standard Double Room,2026-12-05,2,2,5280,1584,confirmed
+B1006,Lin Po-Wei,8812,Dorm Bed,2026-11-05,4,1,2700,810,confirmed
+B1007,Kuo Hsin-Yi,4459,Triple Room,2026-12-19,3,3,9180,2754,confirmed
+B1008,Chang Wei-Ting,6604,Seaview Double Room,2026-10-24,2,2,6400,1920,checked_out
+B1009,Hsu Ming-Che,1290,Family Room,2026-12-24,2,4,10080,3024,confirmed
+B1010,Yang Li-Chun,3871,Twin Room,2026-11-12,2,2,5720,1716,cancelled

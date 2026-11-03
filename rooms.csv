@@ -1,0 +1,18 @@
+item_id,name,name_zh,aliases,category,price,unit,max_guests,available
+1,Standard Double Room,標準雙人房,standard;double;雙人房;標準房;一大床,room,2400,per night,2,1
+2,Seaview Double Room,海景雙人房,seaview double;sea view;ocean view;海景房;海景雙人,room,3200,per night,2,1
+3,Twin Room,雙床房,twin;two beds;兩小床;雙床,room,2600,per night,2,1
+4,Triple Room,三人房,triple;three people;三人,room,3400,per night,3,1
+5,Family Room,家庭四人房,family;four people;四人房;家庭房,room,4200,per night,4,1
+6,Seaview Family Suite,海景家庭套房,suite;family suite;sea view family;海景套房;套房,room,5200,per night,4,0
+7,Dorm Bed,背包客床位,dorm;bed;backpacker;hostel;床位;背包客,room,750,per night,1,1
+8,Tatami Room,和室六人房,tatami;japanese room;six people;和室;六人房,room,5600,per night,6,1
+9,Breakfast,早餐,breakfast;morning meal;早餐,service,180,per person,,1
+10,Bike Rental,單車租借,bike;bicycle;cycling;腳踏車;單車;自行車,service,150,per bike per day,,1
+11,Airport Pickup,機場接送,airport;pickup;transfer;接機;送機;接送,service,800,per trip,,1
+12,Round-trip Ferry Ticket,渡輪來回票,ferry;boat ticket;渡輪;船票,service,60,per person,,1
+13,BBQ Set,烤肉組,bbq;barbecue;grill;烤肉,service,1200,per set,,1
+14,Late Checkout,延遲退房,late checkout;late check-out;延後退房;晚退房,service,500,per time,,1
+15,Extra Bed,加床,extra bed;add a bed;加床,service,600,per bed per night,,1
+16,Pet Cleaning Fee,寵物清潔費,pet;dog;cat;寵物;狗;貓,service,400,per stay,,1
+17,Cijin Island Guided Tour,旗津導覽,tour;guided tour;guide;導覽;旅遊,service,350,per person,,0
