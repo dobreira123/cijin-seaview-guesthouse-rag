@@ -58,7 +58,8 @@ guest message ─► agent (LLM with tool calling, at most 6 steps)
 - **Embedding model (RAG):** `bge-m3` through Ollama (understands Chinese and English).
 - **RAG:** `house_rules.md` is cut on its `## ` headings into 15 sections. Each section is embedded once when the
   program starts. A question is embedded, compared with every section by cosine similarity, and the best
-  2 sections with a score of at least `MIN_SCORE` are given to the model. Below that score the agent says it does not
+  2 sections with a score of at least `MIN_SCORE = 0.50` are given to the model (chosen from `rag_scores.txt`: rule
+  questions scored 0.53-0.74, off-topic questions 0.25-0.50). Below that score the agent says it does not
   have the information. The trace panel shows the section titles and scores, and the answer names its source.
 - **Database (SQLite, built from CSV files at every start; `guesthouse.db` is not in the repository):**
 
@@ -68,10 +69,16 @@ guest message ─► agent (LLM with tool calling, at most 6 steps)
   | `rooms` | `rooms.csv` | 8 rooms + 9 services |
   | `bookings` | `bookings.csv` | 10 fake bookings; new and cancelled bookings are written here |
 
-- **Safety rules in code, not only in the prompt:** a booking is shown only when the booking number *and* the last 4
-  phone digits match; `make_booking` and `cancel_booking` change nothing until they are called again with
-  `confirmed=true`; past dates are refused; the refund (7+ days: all, 3-6 days: 50%, 2 days or less: 0) and the
-  weekend nights are calculated in code; only the listed tools can run.
+- **Safety rules in code, not only in the prompt:**
+  - a booking is shown only when the booking number *and* the last 4 phone digits match;
+  - `make_booking` and `cancel_booking` first return a summary; the row is written only when the guest says yes in
+    the **next** message, and the program saves exactly the summary the guest saw (the model cannot change the room);
+  - past dates are refused; the refund (7+ days: all, 3-6 days: 50%, 2 days or less: 0) and the weekend nights are
+    calculated in code; only the listed tools can run;
+  - the agent keeps its earlier tool calls and results for the next turn, and the program adds a language reminder
+    as the last message;
+  - if the model answers a question that the house rules clearly cover (score ≥ 0.50) **without any tool**, the
+    program runs the RAG search itself, shows it in the trace as "added by the program", and the model answers again.
 - **System prompt:** five parts (role and goal, scope, interaction rules, refusals with exact sentences, opening line).
 - **Chat screen:** Gradio, with a chat tab (greeting, sample questions in English and Chinese, tool trace) and a
   **Bookings** tab that shows the `bookings` table, so you can see that a booking is really saved.
@@ -81,7 +88,8 @@ guest message ─► agent (LLM with tool calling, at most 6 steps)
 | | |
 |---|---|
 | RAG answer with its source | ![RAG](images/screenshot-rag.png) |
-| Booking a room (write), then the Bookings tab | ![booking](images/screenshot-booking.png) ![table](images/screenshot-table.png) |
+| Booking a room (write) | ![booking](images/screenshot-booking.png) |
+| The Bookings tab after booking B1011 and cancelling B1009 | ![table](images/screenshot-table.png) |
 | Not making things up | ![not found](images/screenshot-notfound.png) |
 
 ## Tests
@@ -91,7 +99,11 @@ python test_tool_choice.py   # 16 questions: does the agent choose the right too
 python test_scope.py         # 11 questions: off-topic, prompt attacks, role-play, missing booking, free night, past date
 ```
 
-Results are in `images/test-results.png` and in the report.
+Final result (qwen2.5:14b + bge-m3 on Colab T4): **16/16** and **11/11**. The first versions scored 15/16 and 8/11;
+the misses (a Chinese e-cigarette question with no tool, a printed fake "system prompt", a pool question sent to a
+person without searching) were fixed with clearer routing and the checks in code above.
+
+![Test results](images/test-results.png)
 
 ## Project Files
 
@@ -104,6 +116,7 @@ cijin-seaview-guesthouse-rag/
 ├── bookings.csv         # fake bookings
 ├── test_tool_choice.py  # tool-choice test
 ├── test_scope.py        # scope and "do not make things up" test
+├── rag_scores.txt       # RAG scores of 12 test questions (used to choose MIN_SCORE)
 ├── requirements.txt
 ├── .env.example         # sample settings (no real key)
 ├── .gitignore           # keeps .env and *.db out of git

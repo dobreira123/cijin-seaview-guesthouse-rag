@@ -1,0 +1,12 @@
+0.659 Typhoons and ferry stops 颱風與渡輪停駛   | 0.605 Cancellation and changes 取消與 | If a typhoon comes on my check-in day, can I get my deposit back?
+0.647 Accessibility and stairs 無障礙與樓梯    | 0.444 Shared kitchen 共用廚房          | My grandmother uses a wheelchair. Is there an elevator?
+0.638 Quiet hours and smoking 安靜時間與吸菸    | 0.502 Shared kitchen 共用廚房          | 可以在房間抽電子菸嗎？
+0.607 Children and extra beds 兒童與加床      | 0.507 Pets 寵物                      | Can my 5-year-old son sleep in our bed for free?
+0.668 Damage, keys and lost items 損壞、鑰匙與 | 0.620 Privacy and security cameras | 退房時忘了東西，你們會保留多久？
+0.534 Beach and sea safety 海灘與戲水安全       | 0.480 Shared kitchen 共用廚房          | Do you have a swimming pool?
+0.656 Pets 寵物                            | 0.496 Beach and sea safety 海灘與戲水安全 | Can I bring my cat?
+0.561 Payment, receipts and invoices 付款、 | 0.468 Complaints and help 申訴與協助    | 可以開發票打統編嗎？
+0.496 Typhoons and ferry stops 颱風與渡輪停駛   | 0.388 Quiet hours and smoking 安靜時間 | What is the weather in Kaohsiung tomorrow?
+0.427 Quiet hours and smoking 安靜時間與吸菸    | 0.411 Complaints and help 申訴與協助    | 幫我寫一段 Python 程式
+0.252 Complaints and help 申訴與協助          | 0.251 Typhoons and ferry stops 颱風與 | Who won the World Cup?
+0.524 Accessibility and stairs 無障礙與樓梯    | 0.503 Beach and sea safety 海灘與戲水安全 | Is there a gym?
